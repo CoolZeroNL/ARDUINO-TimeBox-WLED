@@ -21,6 +21,8 @@ const char* ntpServer = "pool.ntp.org";
 const long  gmtOffset_sec = 0;
 const int   daylightOffset_sec = 3600;
 
+bool GreenSetAlready = false;
+
 // Variables will change:
 int buttonState;             // the current reading from the input pin
 int lastButtonState = LOW;   // the previous reading from the input pin
@@ -64,27 +66,14 @@ long int LastTriggered;
 
 long int printLocalTime()
 {
+    time_t rawtime;
+    struct tm * timeinfo;
+    time (&rawtime);                      // Unix Timestamp
+    timeinfo = localtime (&rawtime);      // Apply localzone
 
-       time_t now = time(nullptr);
-//       Serial.println(ctime(&now));
-//        Serial.println(now);
-
-  //------------------------------
-  
-//  time_t rawtime;
-//  struct tm * timeinfo;
-//  time (&rawtime);                      // Unix Timestamp
-//  timeinfo = localtime (&rawtime);      // Apply localzone
-//  
-    //  printf("rawtime = %i \n", timeinfo);  // printout the timestamp
-    //  sprintf(buffer,"%i",timeinfo);
-    //  LastTriggered = buffer;
-    //  Serial.println(LastTriggered);
-  
-   
-        //formatting:
-      //      strftime (buffer,80," %d %B %Y %H:%M:%S ",timeinfo);
-      //      Serial.println(buffer);
+    time_t now = time(nullptr);
+    // Serial.println(ctime(&now));
+    // Serial.println(now);
 
     return now;
 }
@@ -96,7 +85,7 @@ void CallAPI(String myString, bool output) {
 
   XMLDocument xmlDocument;
 
-  Serial.print("[HTTP] begin...");
+  Serial.print(myString + " [HTTP] begin...");
   if (http.begin(client, mainURL+myString)) {  // HTTP
 
     Serial.print("[HTTP] GET...");
@@ -107,7 +96,7 @@ void CallAPI(String myString, bool output) {
     if (httpCode > 0) {
       // HTTP header has been send and Server response header has been handled
             
-      Serial.printf("[HTTP] GET... code: %d", httpCode);
+      Serial.printf("[HTTP] RESPONSE... code: %d \n", httpCode);
 
       // file found at server
       if (output){
@@ -206,9 +195,14 @@ void loop()
 //  Serial.println(diff_t); // in seconds
 
   // check if Last Triggered was an hour ago
-  if (diff_t > 3600){       // 60min
-    // set color green
-    CallAPI(ColorGreen,false);    // Reset to Preset    
+  if (!GreenSetAlready){
+    if (LastTriggered != 0){
+      if (diff_t > 3600){       // 60min
+        // set color green
+          CallAPI(ColorGreen,false);    // Set color to green   
+          GreenSetAlready=true;         // set to true, so we dont hammer the api
+      }
+    }
   }
  
   if ((millis() - lastDebounceTime) > debounceDelay) {
@@ -223,11 +217,13 @@ void loop()
       if (buttonState == HIGH) {
         //do stuff, when pressed the switch
 
-        CallAPI("/win",true);          // get & save current RGB value    
+        //CallAPI("/win",true);          // get & save current RGB value    
         
         LastTriggered = printLocalTime();              // save time..
         
         CallAPI(ColorPreset,false);    // Reset to Preset
+
+        GreenSetAlready=false;        // set to false, so we can set it to green in a hour
         
       }
     }
@@ -236,5 +232,5 @@ void loop()
 
   // save the reading. Next time through the loop, it'll be the lastButtonState:
   lastButtonState = switchStatus;
-//  delay(10000); // 1 sec
+//  delay(1000); // 1 sec
 }
